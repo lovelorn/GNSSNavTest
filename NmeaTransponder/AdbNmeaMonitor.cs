@@ -23,7 +23,7 @@ namespace NMEAMonitor
 
     public class AdbNmeaMonitor
     {
-        
+        #region 公有属性
         /// <summary>
         /// 获取一个值，该值表明adb监视器是否正在工作
         /// </summary>
@@ -36,10 +36,6 @@ namespace NMEAMonitor
                 return mMonitorThread.IsAlive;
             }
         }
-        ///// <summary>
-        ///// 获取或者设置NMEA数据队列，每一个元素代表一条NMEA语句
-        ///// </summary>
-        //public List<string> NmeaData { get; set; }
         /// <summary>
         /// Reveice事件，当接收到一条nmea信息时触发
         /// </summary>
@@ -57,17 +53,19 @@ namespace NMEAMonitor
         /// </summary>
         public StreamWriter TransponderStream { get; set; }
 
-        private string mAdbFilePath = "";
+        #endregion
+
+        #region 私有变量
         private Process mProcess;
         private Thread mMonitorThread;
         private bool needEndThread = false;
 
         private static bool IsHasReceivedMessage = false;
-        private static string OneLine = "";
-        private static int BufferSize = 1024*1024;
+        private static int BufferSize = 256;
         private static AdbNmeaStream adbNmeaStream = new AdbNmeaStream();
 
         private const string ErrorRemind = "数据接收异常，请检测以下内容：\r\n\r\n1、手机是否已连接，并且正确安装了驱动程序\r\n\r\n2、手机的'连接USB后启动调试模式'是否已经开启\r\n\r\n3、nmea2log APP是否已经开启并且运行";
+        #endregion
 
         #region 构造函数
         public AdbNmeaMonitor()
@@ -114,7 +112,7 @@ namespace NMEAMonitor
             {
                 return AdbStartResult.AdbFileNotExist;
             }
-
+            ClearAdbProcess();
             string cmdstring = "\"" + adbFilePath + "\" logcat -v tag -s NMEA2LOG";
 
             mProcess = new Process();
@@ -126,217 +124,43 @@ namespace NMEAMonitor
             mProcess.StartInfo.CreateNoWindow = true;
             mProcess.Start();
 
-            mProcess.StandardInput.WriteLine(cmdstring);
-            //NmeaData.Clear();
-            needEndThread = false;
+            mProcess.OutputDataReceived += new DataReceivedEventHandler(OnDataReceived);
+            mProcess.BeginOutputReadLine();
 
-            mMonitorThread = new Thread(new ThreadStart(NmeaMonitorThreadHandleUsingManualReset));
-            mMonitorThread.Start();
-            while (mMonitorThread.IsAlive == false) ;
-            return AdbStartResult.Success;
+            mProcess.StandardInput.WriteLine(cmdstring);
+
+            return AdbStartResult.Success; 
+        }
+
+        private void OnDataReceived(object Sender, DataReceivedEventArgs e)
+        {
+            if (e.Data != null)
+            {
+                int StartIndex = e.Data.IndexOf('$');
+                if (StartIndex < 0)
+                    return;
+                string message = e.Data.Substring(StartIndex) + "\r\n";
+                //如果需要转发
+                if (TransponderNmeaData == true && TransponderStream != null)
+                {
+                    //byte[] streambuffer = Encoding.Default.GetBytes(oneline);
+                    TransponderStream.Write(message);
+                }
+                if (OnReceive != null)
+                {
+                    OnReceive(message, new EventArgs());
+                }
+            }
         }
 
         public void StopReceive()
         {
-            if (mMonitorThread == null)
-                return;
-            if (mMonitorThread.IsAlive == false)
-                return;
-            needEndThread = true;
-            mMonitorThread.Abort();
-            while (mMonitorThread.IsAlive == true) ;
+            mProcess.CancelOutputRead();
+            ClearAdbProcess();
+            mProcess.Kill();
+            mProcess.Close();
+            return;
         }
-
-        private void NmeaMonitorThreadHandle()
-        {
-            StreamReader sr = mProcess.StandardOutput;
-            char[] buffer = new char[1024];
-            string line = "";
-            while (true)
-            {
-                if (needEndThread == true)
-                {
-                    sr.Close();
-                    needEndThread = false;
-                    mProcess.Kill();
-                    ClearAdbProcess();
-                    return;
-                }
-
-                try
-                {
-                    line = sr.ReadLine();
-                    if (line == null)
-                    {
-                        sr.Close();
-                        needEndThread = false;
-                        mProcess.Kill();
-                        ClearAdbProcess();
-                        return;
-                    }
-                }
-                catch
-                {
-                    sr.Close();
-                    needEndThread = false;
-                    mProcess.Kill();
-                    ClearAdbProcess();
-                    return;
-                }
-
-                line += "\n";
-
-                if (line.Contains("$GP"))
-                {
-                    int Index = line.IndexOf("$GP");
-                    string substring = line.Substring(Index);
-
-                    string[] cmds = substring.Split(new char[] { '$' });
-                    foreach (string singel in cmds)
-                    {
-                        string result = singel;
-                        if (result.Contains("GP"))
-                        {
-                            if (result.Contains("\n"))
-                            {
-                                int enterIndex = result.IndexOf('\n');
-                                result = result.Remove(enterIndex);
-                            }
-                            string oneline = "$" + result + "\r\n";
-
-                            //如果需要转发
-                            if (TransponderNmeaData == true && TransponderStream != null)
-                            {
-                                //byte[] streambuffer = Encoding.Default.GetBytes(oneline);
-                                TransponderStream.Write(oneline);
-                            }
-                            ////往队列中添加信息
-                            //lock (NmeaData)
-                            //{
-                            //    NmeaData.Add(oneline);
-                            //}
-
-                            if (OnReceive != null)
-                            {
-                                OnReceive(oneline, new EventArgs());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private void NmeaMonitorThreadHandleUsingManualReset()
-        {
-            StreamReader sr = mProcess.StandardOutput;
-            byte[] buffer = new byte[BufferSize];
-
-            ManualResetEvent mre = new ManualResetEvent(false);
-            AdbAsyncState adbasyncstate = new AdbAsyncState();
-            adbasyncstate.Stream = sr;
-            adbasyncstate.Buffer = buffer;
-            adbasyncstate.EvtHandle = mre;
-
-            while (true)
-            {
-                if (needEndThread == true)
-                {
-                    sr.Close();
-                    needEndThread = false;
-                    mProcess.Kill();
-                    ClearAdbProcess();
-                    return;
-                }
-
-                IsHasReceivedMessage = false;
-                OneLine = "";
-                sr.BaseStream.BeginRead(buffer, 0, BufferSize, new AsyncCallback(AsyncReadCallback), adbasyncstate);
-                adbasyncstate.EvtHandle.Reset();
-
-                if (adbasyncstate.EvtHandle.WaitOne(10000,false) == true)
-                {
-                    if (IsHasReceivedMessage == false)
-                    {
-                        if (OnAdbError != null)
-                        {
-                            OnAdbError(ErrorRemind, new EventArgs());
-                        }
-                    }
-                    int count = adbNmeaStream.Count;
-                    for (int i = 0; i < count; i++)
-                    {
-                        string message = adbNmeaStream.ReadOne();
-                        //如果需要转发
-                        if (TransponderNmeaData == true && TransponderStream != null)
-                        {
-                            //byte[] streambuffer = Encoding.Default.GetBytes(oneline);
-                            TransponderStream.Write(message);
-                        }
-                        ////往队列中添加信息
-                        //lock (NmeaData)
-                        //{
-                        //    NmeaData.Add(oneline);
-                        //}
-
-                        if (OnReceive != null)
-                        {
-                            OnReceive(message, new EventArgs());
-                        }
-                    }
-                }
-                else
-                {
-                    if(OnAdbError != null)
-                    {
-                        OnAdbError(ErrorRemind,new EventArgs());
-                    }
-                }
-
-            }
-        }
-
-
-        private static void AsyncReadCallback(IAsyncResult asyncResult)
-        {
-            AdbAsyncState asyncState = (AdbAsyncState)asyncResult.AsyncState;
-            int readCn = asyncState.Stream.BaseStream.EndRead(asyncResult);
-            //判断是否读到内容
-            if (readCn > 0)
-            {
-                byte[] buffer;
-                if (readCn == BufferSize)
-                    buffer = asyncState.Buffer;
-                else
-                {
-                    buffer = new byte[readCn];
-                    Array.Copy(asyncState.Buffer, 0, buffer, 0, readCn);
-                }
-
-                //输出读取内容值
-                OneLine = Encoding.Default.GetString(buffer);
-                IsHasReceivedMessage = true;
-                adbNmeaStream.Write(OneLine);
-            }
-            else
-            {
-                IsHasReceivedMessage = false;
-            }
-            asyncState.EvtHandle.Set();
-
-            //if (readCn < BufferSize)
-            //{
-            //asyncState.EvtHandle.Set();
-            //}
-            //else
-            //{
-            //    Array.Clear(asyncState.Buffer, 0, BufferSize);
-            //    //再次执行异步读取操作
-            //    asyncState.Stream.BaseStream.BeginRead(asyncState.Buffer, 0, BufferSize, new AsyncCallback(AsyncReadCallback), asyncState);
-            //}
-
-
-        }
-
 
     }
 }

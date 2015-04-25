@@ -45,8 +45,8 @@ namespace AdbStream
         /// <param name="partialString">部分nmea流</param>
         public void Write(string partialString)
         {
-            //lock(this)
-            //{
+            lock(this)
+            {
                 mMessageString += partialString;
                 while (true)
                 {
@@ -72,7 +72,7 @@ namespace AdbStream
                     if (i >= NmeaHeader.Length)
                         break;
                 }
-            //}
+            }
         }
 
         /// <summary>
@@ -81,8 +81,8 @@ namespace AdbStream
         /// <returns></returns>
         public string ReadOne()
         {
-            //lock (this)
-            //{
+            lock (this)
+            {
                 if (mNmeaMessages.Count == 0)
                     return null;
                 else
@@ -91,7 +91,7 @@ namespace AdbStream
                     mNmeaMessages.RemoveAt(0);
                     return result;
                 }
-            //}
+            }
         }
 
         #endregion

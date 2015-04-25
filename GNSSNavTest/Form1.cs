@@ -109,7 +109,7 @@ namespace GNSSNavTest
             rowCounter = 0;
             byteCounter = 0;
             rowIndex = 0;
-            this.Cursor = Cursors.WaitCursor;
+            //this.Cursor = Cursors.WaitCursor;
             AdbMonitor.StartReceive("adb.exe");
 
             this.开始ToolStripMenuItem.Enabled = false;
@@ -178,7 +178,7 @@ namespace GNSSNavTest
         delegate void ErrorDelegate(string message);
         private void OnAdbErrorDelegate(string message)
         {
-            MessageBox.Show(message, "提示");
+            MessageBox.Show(message, "提示"+DateTime.Now.ToString());
             toolStripButton_Stop_Click(null, null);
         }
 
@@ -252,7 +252,6 @@ namespace GNSSNavTest
         {
             this.dataGridView1.Rows.Clear();
             rowIndex = 0;
-
         }
 
 
