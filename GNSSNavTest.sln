@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GNSSNavTest", "GNSSNavTest\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NmeaTransponder", "NmeaTransponder\NmeaTransponder.csproj", "{1A3D2836-EC7F-48CC-81DF-9FE62065C223}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdbNmeaStream", "AdbStream\AdbNmeaStream.csproj", "{5A72D32C-0CF1-4198-85B0-0505BE53B784}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,16 @@ Global
 		{1A3D2836-EC7F-48CC-81DF-9FE62065C223}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{1A3D2836-EC7F-48CC-81DF-9FE62065C223}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{1A3D2836-EC7F-48CC-81DF-9FE62065C223}.Release|x86.ActiveCfg = Release|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{5A72D32C-0CF1-4198-85B0-0505BE53B784}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

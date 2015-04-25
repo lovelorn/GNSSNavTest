@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.IO.Ports;
 using NMEAMonitor;
+using System.IO;
 
 namespace GNSSNavTest
 {

@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.IO.Ports;
+using AdbStream;
 
 namespace NMEAMonitor
 {
@@ -63,7 +64,10 @@ namespace NMEAMonitor
 
         private static bool IsHasReceivedMessage = false;
         private static string OneLine = "";
-        private static int BufferSize = 1024;
+        private static int BufferSize = 1024*1024;
+        private static AdbNmeaStream adbNmeaStream = new AdbNmeaStream();
+
+        private const string ErrorRemind = "数据接收异常，请检测以下内容：\r\n\r\n1、手机是否已连接，并且正确安装了驱动程序\r\n\r\n2、手机的'连接USB后启动调试模式'是否已经开启\r\n\r\n3、nmea2log APP是否已经开启并且运行";
 
         #region 构造函数
         public AdbNmeaMonitor()
@@ -126,7 +130,7 @@ namespace NMEAMonitor
             //NmeaData.Clear();
             needEndThread = false;
 
-            mMonitorThread = new Thread(new ThreadStart(NmeaMonitorThreadHandle));
+            mMonitorThread = new Thread(new ThreadStart(NmeaMonitorThreadHandleUsingManualReset));
             mMonitorThread.Start();
             while (mMonitorThread.IsAlive == false) ;
             return AdbStartResult.Success;
@@ -222,7 +226,6 @@ namespace NMEAMonitor
             }
         }
 
-
         private void NmeaMonitorThreadHandleUsingManualReset()
         {
             StreamReader sr = mProcess.StandardOutput;
@@ -248,85 +251,47 @@ namespace NMEAMonitor
                 IsHasReceivedMessage = false;
                 OneLine = "";
                 sr.BaseStream.BeginRead(buffer, 0, BufferSize, new AsyncCallback(AsyncReadCallback), adbasyncstate);
+                adbasyncstate.EvtHandle.Reset();
 
-                if (adbasyncstate.EvtHandle.WaitOne(5000,false) == true)
+                if (adbasyncstate.EvtHandle.WaitOne(10000,false) == true)
                 {
                     if (IsHasReceivedMessage == false)
                     {
                         if (OnAdbError != null)
                         {
-                            OnAdbError("接收数据超时，请检测智能设备是否已经连接，aaaaaaaapp是否已经开启！", new EventArgs());
+                            OnAdbError(ErrorRemind, new EventArgs());
                         }
                     }
-
-
-                    //如果需要转发
-                    if (TransponderNmeaData == true && TransponderStream != null)
+                    int count = adbNmeaStream.Count;
+                    for (int i = 0; i < count; i++)
                     {
-                        //byte[] streambuffer = Encoding.Default.GetBytes(oneline);
-                        TransponderStream.Write(OneLine);
-                    }
-                    ////往队列中添加信息
-                    //lock (NmeaData)
-                    //{
-                    //    NmeaData.Add(oneline);
-                    //}
+                        string message = adbNmeaStream.ReadOne();
+                        //如果需要转发
+                        if (TransponderNmeaData == true && TransponderStream != null)
+                        {
+                            //byte[] streambuffer = Encoding.Default.GetBytes(oneline);
+                            TransponderStream.Write(message);
+                        }
+                        ////往队列中添加信息
+                        //lock (NmeaData)
+                        //{
+                        //    NmeaData.Add(oneline);
+                        //}
 
-                    if (OnReceive != null)
-                    {
-                        OnReceive(OneLine, new EventArgs());
+                        if (OnReceive != null)
+                        {
+                            OnReceive(message, new EventArgs());
+                        }
                     }
-
                 }
                 else
                 {
                     if(OnAdbError != null)
                     {
-                        OnAdbError("接收数据超时，请检测智能设备是否已经连接，bbbbapp是否已经开启！",new EventArgs());
+                        OnAdbError(ErrorRemind,new EventArgs());
                     }
                 }
 
-                continue;
-
-                OneLine += "\n";
-
-                if (OneLine.Contains("$GP"))
-                {
-                    int Index = OneLine.IndexOf("$GP");
-                    string substring = OneLine.Substring(Index);
-
-                    string[] cmds = substring.Split(new char[] { '$' });
-                    foreach (string singel in cmds)
-                    {
-                        string result = singel;
-                        if (result.Contains("GP"))
-                        {
-                            if (result.Contains("\n"))
-                            {
-                                int enterIndex = result.IndexOf('\n');
-                                result = result.Remove(enterIndex);
-                            }
-                            string oneline = "$" + result + "\r\n";
-
-                            //如果需要转发
-                            if (TransponderNmeaData == true && TransponderStream != null)
-                            {
-                                //byte[] streambuffer = Encoding.Default.GetBytes(oneline);
-                                TransponderStream.Write(oneline);
-                            }
-                            ////往队列中添加信息
-                            //lock (NmeaData)
-                            //{
-                            //    NmeaData.Add(oneline);
-                            //}
-
-                            if (OnReceive != null)
-                            {
-                                OnReceive(oneline, new EventArgs());
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -350,23 +315,24 @@ namespace NMEAMonitor
                 //输出读取内容值
                 OneLine = Encoding.Default.GetString(buffer);
                 IsHasReceivedMessage = true;
-
+                adbNmeaStream.Write(OneLine);
             }
             else
             {
                 IsHasReceivedMessage = false;
             }
+            asyncState.EvtHandle.Set();
 
-            if (readCn < BufferSize)
-            {
-                asyncState.EvtHandle.Set();
-            }
-            else
-            {
-                Array.Clear(asyncState.Buffer, 0, BufferSize);
-                //再次执行异步读取操作
-                asyncState.Stream.BaseStream.BeginRead(asyncState.Buffer, 0, BufferSize, new AsyncCallback(AsyncReadCallback), asyncState);
-            }
+            //if (readCn < BufferSize)
+            //{
+            //asyncState.EvtHandle.Set();
+            //}
+            //else
+            //{
+            //    Array.Clear(asyncState.Buffer, 0, BufferSize);
+            //    //再次执行异步读取操作
+            //    asyncState.Stream.BaseStream.BeginRead(asyncState.Buffer, 0, BufferSize, new AsyncCallback(AsyncReadCallback), asyncState);
+            //}
 
 
         }
